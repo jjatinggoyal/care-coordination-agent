@@ -5,10 +5,6 @@ it — calls suppliers to find one that can actually serve them, chases the
 physician's office for the written order, rings the patient to explain what
 they'll owe, books the delivery, and asks a human only when it genuinely has to.
 
-**Hosted:** [the simulator](https://dme.jatingoyal.com) ·
-[a finished run](https://dme-replay.jatingoyal.com) ·
-[the decision spine running on Pyodide](https://dme-spine-probe.jatingoyal.workers.dev)
-
 ---
 
 ## Run the demo
@@ -25,12 +21,16 @@ Fill in a case and press **Run**; it works the case live, in front of you.
 - Change anything: the patient, the equipment, the directory, when the case
   opens, who's on the other end of each phone.
 
-**One caveat there.** It's on Cloudflare's free plan, which allows 50 outbound
-requests per run, and a single supplier call costs about ten. So the hosted copy
-ships a **three-supplier directory** and says so in the form. That's enough to
-watch a case resolve end to end, but it isn't the brief's full twelve-row
-directory — for that, run it locally, where there's no such limit. It's a
-billing setting, not a design one.
+It's pre-filled to **resolve end to end** out of the box: one supplier who turns
+her away, one who works, and a clinic that sends the order. Change any of it —
+every persona is in the dropdown.
+
+**One caveat.** It's on Cloudflare's free plan, which allows 50 outbound requests
+per run, and a qualifying supplier call costs about thirteen. Two suppliers plus
+the clinic, the patient and the booking comes to 47; a third makes it 56 and the
+case dies on the last call. So the hosted copy ships two and says so in the form.
+The brief's full twelve-row directory runs locally, where there's no such limit —
+it's a plan setting, not a design one.
 
 There's also [a finished twelve-supplier
 run](https://dme-replay.jatingoyal.com) you can scrub

@@ -173,7 +173,7 @@ function fillForm(d) {
   d.clinic_personas.forEach(c => {
     const o = document.createElement("option"); o.value = c.key; o.textContent = c.label; clinic.append(o);
   });
-  clinic.value = "stalls_once";
+  clinic.value = d.default_clinic || "stalls_once";
   $("#model").value = d.models.caller; $("#sim_model").value = d.models.sim;
   if (d.platform && d.platform.note) {
     const banner = document.createElement("div");

@@ -25,7 +25,7 @@ from workers import Response, WorkerEntrypoint
 
 from dme.llm import CALLER_MODEL, SIM_MODEL
 from dme.loader import default_payload
-from dme.sim.personas import CLINIC_PERSONAS, DEFAULT_CAST, PERSONAS
+from dme.sim.personas import CLINIC_PERSONAS, PERSONAS
 from dme.voice import Voice, voice_for
 from dme.web import run_case_streaming
 
@@ -59,7 +59,35 @@ class Default(WorkerEntrypoint):
     # ten. Pre-filling all twelve of the brief's suppliers here would guarantee
     # every first run dies two thirds of the way through, so the hosted copy
     # ships a shorter directory and says why.
-    HOSTED_SUPPLIERS = 3
+    # Two, not three. A supplier call costs about 2 requests per turn plus an
+    # extraction, and a qualifying call runs six turns because there are five
+    # things to ask. Measured against a real run: clinic 11, a hard-no supplier
+    # 5, a qualifying supplier 13, the patient 9, the booking 9 -- 47, with
+    # three to spare. A third supplier is 56 and the case dies on the last call.
+    HOSTED_SUPPLIERS = 2
+
+    # And it ships a cast that resolves. The first three of the full deck are a
+    # closed panel, a backorder and a phone nobody answers -- so out of the box a
+    # reviewer pressing Run watched it escalate, which is a true thing about the
+    # system and a terrible first impression of it.
+    #
+    # This tells the whole story in three calls and still ends somewhere:
+    #   1. a hard no on the first question
+    #   2. the money trap -- has stock, is fast, does not accept assignment, and
+    #      only says so if asked
+    #   3. a supplier who actually works
+    # Every persona is still in the dropdown; this is only what is pre-filled.
+    # The last one qualifies, so pressing Run out of the box shows a case that
+    # resolves rather than one that escalates. Every other persona is still in
+    # the dropdown -- this is only what is pre-filled.
+    HOSTED_CAST = ("closed_panel", "good")
+
+    # A clinic that sends the order the same day, too. stalls_once is the more
+    # interesting behaviour and it is one dropdown away -- but it costs a broken
+    # promise, two redials, a fax and a human task, and on a 50-request budget
+    # that is the difference between a case that resolves and one that dies on
+    # the last call.
+    HOSTED_CLINIC = "prompt"
 
     def defaults(self) -> Response:
         payload = default_payload()
@@ -70,13 +98,17 @@ class Default(WorkerEntrypoint):
                 "platform": {
                     "hosted": True,
                     "note": (
-                        f"Running on Cloudflare's free plan: 50 outbound requests per run, "
-                        f"and one supplier call costs about ten. The directory is trimmed to "
-                        f"{self.HOSTED_SUPPLIERS} for that reason. The full twelve-row "
-                        f"directory runs locally, or here on a paid plan."
+                        f"Cloudflare's free plan allows 50 outbound requests per run and a "
+                        f"supplier call costs about ten, so this is pre-filled with "
+                        f"{self.HOSTED_SUPPLIERS} suppliers — one that turns her away and one "
+                        f"that works — which resolves end to end with a little to spare. Add "
+                        f"a third and it will run out partway through: that is the plan, not "
+                        f"the design. Change any persona to see the other behaviours; the "
+                        f"full twelve-row directory runs locally."
                     ),
                 },
-                "default_cast": list(DEFAULT_CAST),
+                "default_cast": list(self.HOSTED_CAST),
+                "default_clinic": self.HOSTED_CLINIC,
                 "personas": [{"key": p.key, "label": p.label} for p in PERSONAS],
                 "clinic_personas": [
                     {"key": c.key, "label": c.label} for c in CLINIC_PERSONAS.values()
