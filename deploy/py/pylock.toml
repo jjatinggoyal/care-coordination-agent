@@ -1,0 +1,13 @@
+lock-version = "1.0"
+created-by = "uv"
+requires-python = ">=3.13.2"
+
+[[packages]]
+name = "tzdata"
+version = "2026.3"
+wheels = [{ url = "https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl", upload-time = 2026-07-10T08:50:36Z, size = 348168, hashes = { sha256 = "dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931" } }]
+
+[[packages]]
+name = "workers-runtime-sdk"
+version = "1.8.2"
+wheels = [{ url = "https://files.pythonhosted.org/packages/51/d9/b7632ded6d27edbaa4c9cad5cc104aba6cfa3bb2d93551d216b170834dbb/workers_runtime_sdk-1.8.2-py3-none-any.whl", upload-time = 2026-08-31T15:01:28Z, size = 35569, hashes = { sha256 = "45a429b71270d58923297fb9ffd34f3636e10bdebfcfa74e570da42d73117d7e" } }]

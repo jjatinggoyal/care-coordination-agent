@@ -1,0 +1,17 @@
+{
+  "name": "dme-simulator",
+  "main": "src/worker.py",
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": ["python_workers"],
+  "assets": {
+    "directory": "./public/",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  // No "limits" block: CPU limits are a paid-plan setting. This account is on
+  // the free plan, which also caps subrequests at 50 per invocation -- see
+  // deploy/README.md for what that means for directory size.
+  "observability": {
+    "enabled": true
+  }
+}

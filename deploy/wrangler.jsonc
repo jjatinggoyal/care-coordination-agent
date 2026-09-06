@@ -1,0 +1,13 @@
+{
+  // Assets-only Worker: the replay is one self-contained HTML file, so there is
+  // no Worker script, no binding, and nothing server-side to secure.
+  //
+  // This publishes the REPLAY (a finished run) only. The live simulator is not
+  // here on purpose -- see deploy/README.md for why.
+  "name": "dme-coordination-replay",
+  "compatibility_date": "2026-09-05",
+  "assets": {
+    "directory": "./public/",
+    "not_found_handling": "404-page"
+  }
+}
