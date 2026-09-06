@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DME coordination — simulator</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>DME coordination simulator</h1>
+    <span class="sub" id="caseline">configure a case and run it</span>
+    <span class="spacer"></span>
+    <button class="ghost" id="theme">theme</button>
+  </header>
+  <div class="sub" id="worldline" style="margin-bottom:14px"></div>
+
+  <div class="app">
+    <div class="card config">
+      <h2>The case</h2>
+      <div class="hint">Nothing here is hard-coded to the brief's patient. Change any of it —
+        different equipment, a different directory, a different set of people on the phones.</div>
+
+      <div class="f">
+        <label>patient</label><input type="text" id="p_name">
+        <label>age</label><input type="number" id="p_age" min="0" max="120">
+        <label>coverage</label><input type="text" id="p_coverage">
+        <label>ZIP</label><input type="text" id="p_zip">
+        <label>phone</label><input type="text" id="p_phone">
+      </div>
+      <div class="inline"><input type="checkbox" id="p_supp"><label for="p_supp">has a supplemental / Medigap plan</label></div>
+      <div class="inline"><input type="checkbox" id="p_zipassumed"><label for="p_zipassumed">ZIP is assumed, not known</label></div>
+
+      <h3>Equipment</h3>
+      <div class="f">
+        <label>item</label><input type="text" id="equipment">
+        <label>HCPCS</label><input type="text" id="hcpcs">
+      </div>
+
+      <h3>Ordering physician</h3>
+      <div class="f">
+        <label>name</label><input type="text" id="pcp_name">
+        <label>practice</label><input type="text" id="pcp_practice">
+        <label>phone</label><input type="text" id="pcp_phone">
+      </div>
+
+      <h3>When the case opens</h3>
+      <div class="f"><label>date &amp; time</label><input type="datetime-local" id="opened_at"></div>
+      <div class="hint">The brief's own case opens at 02:14 — everyone it needs is shut. Move it to
+        a Friday afternoon and watch the weekend swallow the written order.</div>
+
+      <h3>Supplier directory</h3>
+      <div class="hint">Name, phone, address — the columns the brief actually gives you. The
+        dropdown is who plays them on the phone; it is not visible to the system.</div>
+      <div class="sup-rows" id="suppliers"></div>
+      <button class="ghost addrow" id="addsup">+ add a supplier</button>
+
+      <h3>The world</h3>
+      <div class="f">
+        <label>clinic</label><select id="clinic"></select>
+        <label>seed</label><input type="number" id="seed" value="7">
+        <label>answers on</label><input type="number" id="answers_after" value="1" min="1" max="5">
+      </div>
+      <div class="inline"><input type="checkbox" id="accepts" checked><label for="accepts">the patient accepts the cost share</label></div>
+
+      <h3>Models</h3>
+      <div class="f">
+        <label>system</label><input type="text" id="model">
+        <label>world</label><input type="text" id="sim_model">
+      </div>
+      <div class="hint">Different families on purpose — one model both hiding a fact and asked to
+        find it flatters the result.</div>
+
+      <button class="run" id="run">Run this case</button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div>
+      <div class="tiles" id="tiles"></div>
+      <div class="assume" id="assumptions"></div>
+
+      <div class="section card tl">
+        <h2>Simulated time</h2>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--supplier)"></i> supplier search</span>
+          <span><i class="swatch" style="background:var(--order)"></i> written order</span>
+          <span><i class="swatch" style="background:var(--patient)"></i> patient</span>
+          <span class="sub">hollow = decision · filled = call</span>
+          <span class="spacer"></span>
+          <button class="ghost" id="scale">scale: elapsed time</button>
+        </div>
+        <div class="lanes" id="lanes"></div>
+        <div class="axis"><div></div><div class="ticks" id="ticks"></div></div>
+        <div class="controls">
+          <button class="play" id="play">▶ play</button>
+          <input type="range" id="scrub" min="0" value="0">
+          <span class="stamp" id="stamp"></span>
+        </div>
+      </div>
+
+      <div class="section split">
+        <div class="card">
+          <h2>What it decided, and why</h2>
+          <div class="feed" id="feed"><div class="waiting">Press <b>Run this case</b> and it starts working.</div></div>
+        </div>
+        <div>
+          <div class="card">
+            <h2>State at this moment</h2>
+            <div id="tracks"></div>
+            <div class="board" id="board"></div>
+          </div>
+          <div class="section card panel">
+            <h2 id="paneltitle">Call detail</h2>
+            <div id="panel" class="empty">Calls appear here as they happen. Click one — or any
+              green/red fact on a supplier card — to read the conversation behind it.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section card" id="packetcard" hidden>
+        <h2>Handoff packet</h2>
+        <pre class="packet" id="packet"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script src="/replay.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+let DEFAULTS = null, RUN = null, running = false, audio = null, voiceAvailable = false;
+
+/* ---- config form ------------------------------------------------------- */
+function supplierRow(s) {
+  const row = document.createElement("div");
+  row.className = "sup-row";
+  const name = document.createElement("input");
+  name.type = "text"; name.value = s.name || ""; name.placeholder = "supplier name";
+  name.dataset.k = "name";
+  const persona = document.createElement("select");
+  persona.dataset.k = "persona";
+  const opts = [["random", "random"]].concat(DEFAULTS.personas.map(p => [p.key, p.label]));
+  opts.forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; persona.append(o); });
+  persona.value = s.persona || "random";
+  persona.title = "who plays them on the phone";
+  const del = document.createElement("button");
+  del.className = "x"; del.textContent = "×"; del.title = "remove";
+  del.addEventListener("click", () => row.remove());
+  const phone = document.createElement("input");
+  phone.type = "hidden"; phone.value = s.phone || ""; phone.dataset.k = "phone";
+  const addr = document.createElement("input");
+  addr.type = "hidden"; addr.value = s.address || ""; addr.dataset.k = "address";
+  row.append(name, persona, del, phone, addr);
+  return row;
+}
+
+function fillForm(d) {
+  const p = d.case.patient;
+  $("#p_name").value = p.name; $("#p_age").value = p.age;
+  $("#p_coverage").value = p.coverage; $("#p_zip").value = p.zip_code || p.zip || "";
+  $("#p_phone").value = p.phone || "";
+  $("#p_supp").checked = !!p.has_supplemental;
+  $("#p_zipassumed").checked = !!(p.zip_is_assumed ?? p.zip_assumed);
+  $("#equipment").value = d.case.equipment; $("#hcpcs").value = d.case.hcpcs;
+  $("#pcp_name").value = d.case.pcp_name; $("#pcp_practice").value = d.case.pcp_practice;
+  $("#pcp_phone").value = d.case.pcp_phone || "";
+  $("#opened_at").value = d.case.opened_at.slice(0, 16);
+  const host = $("#suppliers"); host.innerHTML = "";
+  (d.case.suppliers || []).forEach((s, i) => host.append(supplierRow({ ...s, persona: d.default_cast[i] || "random" })));
+  const clinic = $("#clinic");
+  d.clinic_personas.forEach(c => {
+    const o = document.createElement("option"); o.value = c.key; o.textContent = c.label; clinic.append(o);
+  });
+  clinic.value = "stalls_once";
+  $("#model").value = d.models.caller; $("#sim_model").value = d.models.sim;
+  if (d.platform && d.platform.note) {
+    const banner = document.createElement("div");
+    banner.className = "hint";
+    banner.style.color = "var(--serious)";
+    banner.textContent = d.platform.note;
+    $("#suppliers").before(banner);
+  }
+  voiceAvailable = !!d.voice_available;
+}
+
+function readForm() {
+  const suppliers = [...document.querySelectorAll(".sup-row")].map(row => {
+    const get = (k) => (row.querySelector(`[data-k="${k}"]`) || {}).value || "";
+    return { name: get("name"), phone: get("phone"), address: get("address"), persona: get("persona") };
+  }).filter(s => s.name.trim());
+  return {
+    case: {
+      case_id: "case-adhoc",
+      patient: {
+        name: $("#p_name").value, age: +$("#p_age").value, coverage: $("#p_coverage").value,
+        has_supplemental: $("#p_supp").checked, zip_code: $("#p_zip").value,
+        zip_is_assumed: $("#p_zipassumed").checked, phone: $("#p_phone").value,
+      },
+      equipment: $("#equipment").value, hcpcs: $("#hcpcs").value,
+      pcp_name: $("#pcp_name").value, pcp_practice: $("#pcp_practice").value,
+      pcp_phone: $("#pcp_phone").value,
+      opened_at: $("#opened_at").value + ":00",
+      suppliers,
+      assumptions: $("#p_zipassumed").checked
+        ? ["zip_code: assumed rather than known — 'will they deliver to her?' is a gate that cannot be evaluated without one, so it is flagged rather than hidden."]
+        : [],
+    },
+    world: {
+      clinic: $("#clinic").value, seed: +$("#seed").value,
+      patient_answers_after: +$("#answers_after").value,
+      patient_accepts_cost: $("#accepts").checked,
+      personas: Object.fromEntries(suppliers.map((s, i) => ["s" + String(i + 1).padStart(2, "0"), s.persona])),
+    },
+    models: { caller: $("#model").value.trim(), sim: $("#sim_model").value.trim() },
+  };
+}
+
+/* ---- voice ------------------------------------------------------------- */
+async function speak(button, who, counterpart, text) {
+  if (!voiceAvailable) {
+    setStatus("no SARVAM_API_KEY on this server, so the calls stay silent", true);
+    return;
+  }
+  if (audio) { audio.pause(); audio = null; }
+  document.querySelectorAll(".audio-btn.on").forEach(b => { b.classList.remove("on"); b.textContent = "▸"; });
+  button.classList.add("on"); button.textContent = "…";
+  try {
+    const r = await fetch("/api/voice", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ who, counterpart, text }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    audio = new Audio("data:audio/mpeg;base64," + d.audio);
+    button.textContent = "❚❚";
+    audio.addEventListener("ended", () => { button.classList.remove("on"); button.textContent = "▸"; });
+    await audio.play();
+  } catch (e) {
+    button.classList.remove("on"); button.textContent = "▸";
+    setStatus("voice: " + e.message, true);
+  }
+}
+
+/* ---- running ----------------------------------------------------------- */
+function setStatus(text, bad) {
+  const s = $("#status"); s.textContent = text; s.classList.toggle("err", !!bad);
+}
+
+async function run() {
+  if (running) return;
+  running = true;
+  $("#run").disabled = true;
+  $("#feed").innerHTML = "";
+  $("#packetcard").hidden = true;
+  setStatus("starting…");
+
+  const config = readForm();
+  RUN = { case: {}, suppliers: [], steps: [], frames: [], calls: {}, messages: [], outcome: null, usage: {} };
+  Viewer.init(RUN, { follow: true, onVoice: speak, voiceAvailable: () => voiceAvailable });
+
+  try {
+    const response = await fetch("/api/run", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.trim()) handle(JSON.parse(line));
+      }
+    }
+  } catch (e) {
+    setStatus("failed: " + e.message, true);
+  } finally {
+    running = false;
+    $("#run").disabled = false;
+  }
+}
+
+function handle(msg) {
+  switch (msg.t) {
+    case "case":
+      RUN.case = msg.case; RUN.suppliers = msg.suppliers;
+      setStatus("working the case…");
+      break;
+    case "step":
+      RUN.steps.push(msg.step); RUN.frames.push(msg.frame);
+      Viewer.refresh(false);
+      setStatus(RUN.steps.length + " decisions · " + Object.keys(RUN.calls).length + " calls");
+      break;
+    case "call":
+      RUN.calls[msg.id] = msg.call;
+      break;
+    case "callnote":
+      Object.assign(RUN.calls[msg.id] || (RUN.calls[msg.id] = {}), msg.note);
+      break;
+    case "message":
+      RUN.messages.push(msg.message);
+      break;
+    case "done":
+      RUN.outcome = msg.outcome; RUN.usage = msg.usage;
+      Viewer.setFollow(false);
+      Viewer.refresh(true);
+      setStatus(msg.outcome.resolved ? "resolved with no human involved"
+        : msg.outcome.escalation ? "escalated: " + msg.outcome.escalation : "stalled");
+      break;
+    case "error":
+      setStatus("failed: " + msg.message, true);
+      break;
+  }
+}
+
+/* ---- boot -------------------------------------------------------------- */
+fetch("/api/defaults").then(r => r.json()).then(d => {
+  DEFAULTS = d;
+  fillForm(d);
+  setStatus("ready");
+});
+$("#addsup").addEventListener("click", () => $("#suppliers").append(supplierRow({})));
+$("#run").addEventListener("click", run);
+$("#theme").addEventListener("click", () => {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DME case replay</title>
+<style>__STYLE__</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>DME case replay</h1>
+    <span class="sub" id="caseline"></span>
+    <span class="spacer"></span>
+    <button class="ghost" id="theme">theme</button>
+  </header>
+  <div class="sub" id="worldline" style="margin-bottom:14px"></div>
+
+  <div class="tiles" id="tiles"></div>
+  <div class="assume" id="assumptions"></div>
+
+  <div class="section card tl">
+    <h2>Simulated time</h2>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--supplier)"></i> supplier search</span>
+      <span><i class="swatch" style="background:var(--order)"></i> written order</span>
+      <span><i class="swatch" style="background:var(--patient)"></i> patient</span>
+      <span class="sub">hollow = a decision with no model in it · filled = a call</span>
+      <span class="spacer"></span>
+      <button class="ghost" id="scale">scale: elapsed time</button>
+    </div>
+    <div class="lanes" id="lanes"></div>
+    <div class="axis"><div></div><div class="ticks" id="ticks"></div></div>
+    <div class="controls">
+      <button class="play" id="play">▶ play</button>
+      <input type="range" id="scrub" min="0" value="0">
+      <span class="stamp" id="stamp"></span>
+    </div>
+  </div>
+
+  <div class="section split">
+    <div class="card">
+      <h2>What it decided, and why</h2>
+      <div class="feed" id="feed"></div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>State at this moment</h2>
+        <div id="tracks"></div>
+        <div class="board" id="board"></div>
+      </div>
+      <div class="section card panel">
+        <h2 id="paneltitle">Call detail</h2>
+        <div id="panel" class="empty">Click any call in the timeline or the feed — or any green/red fact on a supplier card — to read the conversation that produced it.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section card" id="packetcard" hidden>
+    <h2>Handoff packet</h2>
+    <pre class="packet" id="packet"></pre>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script>const RUN = __RUN_DATA__;</script>
+<script>__SCRIPT__</script>
+<script>Viewer.init(RUN);</script>
+</body>
+</html>
