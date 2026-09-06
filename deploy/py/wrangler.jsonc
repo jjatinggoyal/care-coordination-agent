@@ -3,6 +3,9 @@
   "main": "src/worker.py",
   "compatibility_date": "2026-09-05",
   "compatibility_flags": ["python_workers"],
+  "routes": [
+    { "pattern": "dme.jatingoyal.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./public/",
     "binding": "ASSETS",

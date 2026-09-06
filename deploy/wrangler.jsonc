@@ -6,6 +6,9 @@
   // here on purpose -- see deploy/README.md for why.
   "name": "dme-coordination-replay",
   "compatibility_date": "2026-09-05",
+  "routes": [
+    { "pattern": "dme-replay.jatingoyal.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./public/",
     "not_found_handling": "404-page"

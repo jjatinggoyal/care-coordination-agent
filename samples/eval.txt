@@ -1,0 +1,28 @@
+
+  running 6 case(s) — each one is dozens of real model calls
+
+  seed  clinic       outcome                 days  calls  vetoed  blocked
+  ───────────────────────────────────────────────────────────────────────
+     1  stalls_once  closed_delivered         4.3     22       0        0
+     2  prompt       closed_delivered         0.4     16       0        0
+     3  stalls_once  closed_delivered         4.4     24       3        0
+     4  black_hole   order_unobtainable       6.2     14       0        0
+     5  miscodes     order_coding_mismatch    4.2     13       1        0
+     6  stalls_once  closed_delivered         4.3     21       0        0
+
+  ── summary ────────────────────────────────────────────────────────
+  resolved with no human:   4/6  (67%)
+  median days to delivery:  4.3
+  median calls per case:    18
+  suppliers tried to find one that works (median): 6
+  answers vetoed as ungrounded:  4
+  invented identifiers blocked: 0
+
+  escalations, by reason:
+      1  order_unobtainable
+      1  order_coding_mismatch
+
+  709 model calls (caller=303, extractor=93, patient_message=10, sim_clinic=40, sim_supplier=263); 562,777 in / 95,450 out tokens
+
+  replay any row:  python scripts/run_case.py --seed N --clinic X --transcripts
+

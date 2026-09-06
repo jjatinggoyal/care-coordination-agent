@@ -1,0 +1,181 @@
+── case ──────────────────────────────────────────────────────────────────────
+  Eleanor Martinez, 72 — Original Medicare (Part B), no supplemental plan
+  Standard manual wheelchair (K0001) · ordering physician Dr. Sarah Chen, Sunrise Family Medicine
+  opened Thu 03 Sep 02:14 — everyone this case needs is closed
+  12 suppliers in the directory · clinic behaves as: front desk promises, nothing arrives, sends it after the nudge
+
+  assumption · zip_code: the brief gives Dr. Chen's practice location but never Eleanor's address. 'Does this supplier deliver to her?' is a gate we cannot evaluate without one, so 60614 is assumed and flagged. In a real intake this field is captured; here it is invented, and the code says so rather than hiding it.
+  assumption · phone: not supplied in the brief. Invented, in the same 555 range as the rest of the fixtures.
+  assumption · opened_at: 02:14 on a Thursday. Chosen literally -- 'with the care advocate asleep' means every organisation this case needs is shut when it opens.
+
+── run ───────────────────────────────────────────────────────────────────────
+  Thu 03 Sep 02:14  ·  wait until Thu 03 Sep 08:00  (nothing is due yet)
+  Thu 03 Sep 08:00  →  call Sunrise Family Medicine (attempt 1)
+                       because: written order still outstanding
+                       called Dr. Chen's office -> answered (4 turns)
+                       written order requested by phone
+                       clinic promised the written order (not believed until it arrives)
+                       clinic committed to send_written_order
+  Thu 03 Sep 08:13  ·  wait until Thu 03 Sep 09:00  (nothing is due yet)
+  Thu 03 Sep 09:00  →  call Lakeshore Home Medical Equipment
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Lakeshore Home Medical Equipment -> answered (1 turns)
+                       learned about Lakeshore Home Medical Equipment: accepts_new_medicare_patients=no
+                       ruled out Lakeshore Home Medical Equipment: accepts_new_medicare_patients
+  Thu 03 Sep 09:08  →  call Windy City Mobility & DME
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Windy City Mobility & DME -> answered (3 turns)
+                       learned about Windy City Mobility & DME: accepts_new_medicare_patients=yes, stocks_k0001=no
+                       ruled out Windy City Mobility & DME: stocks_k0001
+  Thu 03 Sep 09:20  →  call Prairie State Medical Supply
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Prairie State Medical Supply -> no_answer (0 turns)
+  Thu 03 Sep 09:22  →  call Northside CarePlus Equipment
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Northside CarePlus Equipment -> answered (4 turns)
+                       learned about Northside CarePlus Equipment: accepts_new_medicare_patients=yes, accepts_assignment=yes
+  Thu 03 Sep 09:36  →  call ChicagoLand Durable Medical
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called ChicagoLand Durable Medical -> answered (4 turns)
+                       learned about ChicagoLand Durable Medical: accepts_new_medicare_patients=yes, stocks_k0001=yes, accepts_assignment=no, serves_patient_area=yes, earliest_delivery_days=2
+                       ruled out ChicagoLand Durable Medical: accepts_assignment
+  Thu 03 Sep 09:50  →  call Roosevelt Medical Supply Co
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Roosevelt Medical Supply Co -> answered (4 turns)
+                       learned about Roosevelt Medical Supply Co: accepts_new_medicare_patients=yes, stocks_k0001=yes, accepts_assignment=yes
+  Thu 03 Sep 10:04  →  call Halsted Home Health Supply
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Halsted Home Health Supply -> answered (4 turns)
+                       learned about Halsted Home Health Supply: accepts_new_medicare_patients=yes, stocks_k0001=yes, accepts_assignment=yes
+  Thu 03 Sep 10:18  →  call Midwest Mobility Solutions
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Midwest Mobility Solutions -> answered (4 turns)
+                       learned about Midwest Mobility Solutions: accepts_new_medicare_patients=yes, stocks_k0001=yes, serves_patient_area=no
+                       ruled out Midwest Mobility Solutions: serves_patient_area
+  Thu 03 Sep 10:32  →  call Belmont Medical Equipment
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Belmont Medical Equipment -> answered (5 turns)
+                       learned about Belmont Medical Equipment: accepts_new_medicare_patients=yes, stocks_k0001=yes, accepts_assignment=yes, serves_patient_area=yes
+                       QUALIFIED: Belmont Medical Equipment
+  Thu 03 Sep 10:48  →  call Lincoln Park DME Services
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Lincoln Park DME Services -> answered (2 turns)
+                       ruled out Lincoln Park DME Services: demanded identifiers we may not disclose
+  Thu 03 Sep 10:58  →  call South Loop Medical Supply
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called South Loop Medical Supply -> answered (4 turns)
+                       learned about South Loop Medical Supply: accepts_new_medicare_patients=yes, stocks_k0001=yes, accepts_assignment=yes
+  Thu 03 Sep 11:12  →  call Evanston Home Medical
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Evanston Home Medical -> answered (3 turns)
+                       learned about Evanston Home Medical: accepts_new_medicare_patients=yes, stocks_k0001=no
+                       ruled out Evanston Home Medical: stocks_k0001
+  Thu 03 Sep 11:24  →  call Prairie State Medical Supply
+                       because: need: accepts_new_medicare_patients, stocks_k0001, accepts_assignment, serves_patient_area, earliest_delivery_days
+                       called Prairie State Medical Supply -> voicemail (0 turns)
+  Thu 03 Sep 11:26  →  contact Eleanor Martinez about cost
+                       because: a supplier is confirmed; she owes 20% and has to agree to it
+                       patient contacted: cost
+                       patient cost consent: yes
+  Thu 03 Sep 11:36  ·  wait until Thu 03 Sep 12:22  (nothing is due yet)
+  Thu 03 Sep 12:22  →  call Northside CarePlus Equipment
+                       because: need: stocks_k0001, serves_patient_area, earliest_delivery_days
+                       called Northside CarePlus Equipment -> answered (2 turns)
+  Thu 03 Sep 12:32  ·  wait until Thu 03 Sep 12:50  (nothing is due yet)
+  Thu 03 Sep 12:50  →  call Roosevelt Medical Supply Co
+                       because: need: serves_patient_area, earliest_delivery_days
+                       called Roosevelt Medical Supply Co -> voicemail (0 turns)
+  Thu 03 Sep 12:52  ·  wait until Thu 03 Sep 13:04  (nothing is due yet)
+  Thu 03 Sep 13:04  →  call Halsted Home Health Supply
+                       because: need: serves_patient_area, earliest_delivery_days
+                       called Halsted Home Health Supply -> answered (3 turns)
+                       learned about Halsted Home Health Supply: stocks_k0001=yes, accepts_assignment=yes, serves_patient_area=yes, earliest_delivery_days=2
+                       QUALIFIED: Halsted Home Health Supply, 2d delivery
+  Thu 03 Sep 13:16  ·  wait until Fri 04 Sep 08:00  (nothing is due yet)
+                       BROKEN PROMISE: clinic did not send_written_order
+  Fri 04 Sep 08:00  →  call Sunrise Family Medicine (attempt 2)
+                       because: written order still outstanding
+                       called Dr. Chen's office -> no_answer (0 turns)
+  Fri 04 Sep 08:02  ·  wait until Fri 04 Sep 10:00  (nothing is due yet)
+  Fri 04 Sep 10:00  →  call Sunrise Family Medicine (attempt 3)
+                       because: written order still outstanding
+                       called Dr. Chen's office -> answered (3 turns)
+                       written order requested by phone
+  Fri 04 Sep 10:11  ·  wait until Mon 07 Sep 08:00  (nothing is due yet)
+  Mon 07 Sep 08:00  →  fax Sunrise Family Medicine
+                       because: front desk is not producing it by phone; putting it in writing
+                       written order requested by fax
+  Mon 07 Sep 08:03  ·  wait until Tue 08 Sep 08:00  (nothing is due yet)
+                       written order received, coded K0001
+  Tue 08 Sep 08:00  →  send the written order to Halsted Home Health Supply
+                       because: they cannot schedule against an order they do not have
+                       written order sent to Halsted Home Health Supply by fax
+  Tue 08 Sep 08:15  ·  wait until Tue 08 Sep 09:00  (nothing is due yet)
+  Tue 08 Sep 09:00  →  book delivery with Halsted Home Health Supply
+                       because: qualified supplier, written order in their hands, her agreement
+                       called Halsted Home Health Supply -> answered (3 turns)
+                       s07 committed to hold_stock
+  Tue 08 Sep 09:12  ·  wait until Wed 09 Sep 09:12  (nothing is due yet)
+                       BROKEN PROMISE: s07 did not hold_stock
+  Wed 09 Sep 09:12  →  book delivery with Halsted Home Health Supply
+                       because: qualified supplier, written order in their hands, her agreement
+                       called Halsted Home Health Supply -> answered (4 turns)
+                       s07 committed to hold_stock
+  Wed 09 Sep 09:26  ·  wait until Thu 10 Sep 09:26  (nothing is due yet)
+                       BROKEN PROMISE: s07 did not hold_stock
+                       ruled out Halsted Home Health Supply: agreed to book a slot twice, never confirmed either
+  Thu 10 Sep 09:26  →  call South Loop Medical Supply
+                       because: need: serves_patient_area, earliest_delivery_days
+                       called South Loop Medical Supply -> answered (3 turns)
+                       learned about South Loop Medical Supply: stocks_k0001=yes, serves_patient_area=yes, earliest_delivery_days=3
+                       QUALIFIED: South Loop Medical Supply, 3d delivery
+  Thu 10 Sep 09:38  →  send the written order to South Loop Medical Supply
+                       because: they cannot schedule against an order they do not have
+                       written order sent to South Loop Medical Supply by fax
+  Thu 10 Sep 09:53  →  book delivery with South Loop Medical Supply
+                       because: qualified supplier, written order in their hands, her agreement
+                       called South Loop Medical Supply -> answered (2 turns)
+                       DELIVERY SCHEDULED with South Loop Medical Supply for Tue 15 Sep
+  Thu 10 Sep 10:03  →  contact Eleanor Martinez about delivery_window
+                       because: tell her when it is coming
+                       patient contacted: delivery_window
+  Thu 10 Sep 10:08  →  close case: delivered
+                       because: scheduled, coded, and the patient knows
+                       case closed: delivered
+
+── outcome ───────────────────────────────────────────────────────────────────
+  RESOLVED with no human involved.
+  South Loop Medical Supply delivering Tuesday 15 September
+  written order received, coded K0001
+
+  simulated elapsed:  7.3 days
+  phone calls placed: 23
+  model usage:        145 model calls (caller=62, extractor=19, patient_message=2, sim_clinic=7, sim_supplier=55); 116,093 in / 18,661 out tokens
+
+── supplier ledger ───────────────────────────────────────────────────────────
+  ✗ Lakeshore Home Medical Equipment   1 call(s)
+      accepts_new_medicare_patients
+  ✗ Windy City Mobility & DME          1 call(s)
+      stocks_k0001
+  ? Prairie State Medical Supply       2 call(s)
+  ? Northside CarePlus Equipment       2 call(s)
+      accepts new medicare patients=yes (call:c05), accepts assignment=yes (call:c05)
+  ✗ ChicagoLand Durable Medical        1 call(s)
+      accepts_assignment
+  ? Roosevelt Medical Supply Co        2 call(s)
+      accepts new medicare patients=yes (call:c07), stocks k0001=yes (call:c07), accepts assignment=yes (call:c07)
+  ✗ Halsted Home Health Supply         4 call(s)
+      agreed to book a slot twice, never confirmed either
+  ✗ Midwest Mobility Solutions         1 call(s)
+      serves_patient_area
+  ✓ Belmont Medical Equipment          1 call(s)
+      accepts new medicare patients=yes (call:c10), stocks k0001=yes (call:c10), accepts assignment=yes (call:c10), serves patient area=yes (call:c10)
+  ✗ Lincoln Park DME Services          1 call(s)
+      demanded identifiers we may not disclose
+  ✓ South Loop Medical Supply          3 call(s)
+      accepts new medicare patients=yes (call:c12), stocks k0001=yes (call:c22), accepts assignment=yes (call:c12), serves patient area=yes (call:c22), earliest delivery days=3 (call:c22)
+  ✗ Evanston Home Medical              1 call(s)
+      stocks_k0001
+
+  run document written to runs/final.json
+  replay written to samples/replay.html  —  open it in a browser

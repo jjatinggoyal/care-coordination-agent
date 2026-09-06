@@ -5,8 +5,8 @@ things I got wrong on the way, because the wrong version is instructive.
 
 | | |
 |---|---|
-| Replay (a finished run) | https://dme-coordination-replay.jatingoyal.workers.dev |
-| **The simulator, live** | **https://dme-simulator.jatingoyal.workers.dev** |
+| Replay (a finished run) | https://dme-replay.jatingoyal.com |
+| **The simulator, live** | **https://dme.jatingoyal.com** |
 | Spine probe | https://dme-spine-probe.jatingoyal.workers.dev |
 
 ## What I said first, and why it was wrong
