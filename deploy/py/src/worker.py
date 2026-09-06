@@ -78,9 +78,12 @@ class Default(WorkerEntrypoint):
     #   3. a supplier who actually works
     # Every persona is still in the dropdown; this is only what is pre-filled.
     # The last one qualifies, so pressing Run out of the box shows a case that
-    # resolves rather than one that escalates. Every other persona is still in
-    # the dropdown -- this is only what is pre-filled.
-    HOSTED_CAST = ("closed_panel", "good")
+    # resolves rather than one that escalates. It is the three-week supplier
+    # rather than the fast one on purpose: the case still closes, but you can
+    # see the system settle for what is actually available once the directory is
+    # exhausted, and the delivery date says so. Every other persona is in the
+    # dropdown -- this is only what is pre-filled.
+    HOSTED_CAST = ("closed_panel", "good_but_slow")
 
     # A clinic that sends the order the same day, too. stalls_once is the more
     # interesting behaviour and it is one dropdown away -- but it costs a broken
@@ -101,7 +104,8 @@ class Default(WorkerEntrypoint):
                         f"Cloudflare's free plan allows 50 outbound requests per run and a "
                         f"supplier call costs about ten, so this is pre-filled with "
                         f"{self.HOSTED_SUPPLIERS} suppliers — one that turns her away and one "
-                        f"that works — which resolves end to end with a little to spare. Add "
+                        f"that can help, though not quickly — which resolves end to end with "
+                        f"a little to spare. Add "
                         f"a third and it will run out partway through: that is the plan, not "
                         f"the design. Change any persona to see the other behaviours; the "
                         f"full twelve-row directory runs locally."

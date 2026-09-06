@@ -22,7 +22,9 @@ Fill in a case and press **Run**; it works the case live, in front of you.
   opens, who's on the other end of each phone.
 
 It's pre-filled to **resolve end to end** out of the box: one supplier who turns
-her away, one who works, and a clinic that sends the order. Change any of it —
+her away, one who can help but is three weeks out, and a clinic that sends the
+order. So the default shows the system settling for what's actually available
+once the directory is exhausted — the delivery date says so. Change any of it;
 every persona is in the dropdown.
 
 **One caveat.** It's on Cloudflare's free plan, which allows 50 outbound requests

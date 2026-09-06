@@ -285,8 +285,12 @@ class PatientPersona:
 PATIENT_PERSONAS: dict[str, PatientPersona] = {
     "agreeable": PatientPersona(
         key="agreeable",
+        # Always answers. Whether somebody is reachable is expressed by the
+        # other two knobs -- patient_answers_after, and the never_answers
+        # persona -- so a stray 10% here was variance with no meaning, and it
+        # cost a repeat call on a tight request budget.
+        pickup_rate=1.0,
         label="picks up, follows the cost explanation, agrees",
-        pickup_rate=0.9,
         accepts=True,
         style=(
             "You are an older person at home, pleased to hear from the care team about your "
