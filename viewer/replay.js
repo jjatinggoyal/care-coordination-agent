@@ -96,11 +96,31 @@ const Viewer = (() => {
         u.calls ? ((u.input_tokens / 1000).toFixed(0) + "k in / "
                    + (u.output_tokens / 1000).toFixed(0) + "k out")
                 : "none yet");
-    const vetoed = o ? o.vetoed : Object.values(RUN.calls || {}).reduce((n, c) => n + ((c.dropped || []).length), 0);
-    add("answers vetoed", vetoed, vetoed ? "quoted but not in the call" : "every fact traced to a quote");
+    // Two tiles used to count guard failures, and both read zero on most runs --
+    // which is the good outcome, and looks like a broken metric. One tile that
+    // counts the checking instead is true either way: it says the guards ran.
+    const calls = Object.values(RUN.calls || {});
+    const kept = calls.reduce((n, c) => n + Object.keys(c.facts || {}).length, 0);
+    const vetoed = o ? o.vetoed
+      : calls.reduce((n, c) => n + (c.dropped || []).length, 0);
     const blocked = o ? (o.blocked || 0)
-      : Object.values(RUN.calls || {}).reduce((n, c) => n + ((c.blocked || []).length), 0);
-    add("identifiers refused", blocked, blocked ? "our agent tried to invent one" : "nothing invented on a call");
+      : calls.reduce((n, c) => n + (c.blocked || []).length, 0);
+    const turns = calls.reduce(
+      (n, c) => n + (c.lines || []).filter(l => l.who === "agent").length, 0);
+
+    const rejected = vetoed + blocked;
+    const tile = el("div", "tile");
+    tile.append(el("div", "k", "checked"));
+    tile.append(el("div", "v", kept + " facts · " + turns + " turns"));
+    const note = el("div", "n", rejected
+      ? rejected + " rejected — " + [
+          vetoed ? vetoed + " quoted but not said" : null,
+          blocked ? blocked + " identifiers refused" : null,
+        ].filter(Boolean).join(", ")
+      : "every fact quoted, nothing invented");
+    if (rejected) note.style.color = "var(--critical)";
+    tile.append(note);
+    box.append(tile);
   }
 
   /* ---- timeline -------------------------------------------------------- */
