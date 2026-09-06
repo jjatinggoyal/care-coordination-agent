@@ -45,6 +45,7 @@ ATTRIBUTION: dict[str, tuple[str, str]] = {
     "OrderRequested":         ("engine", "performed the action the policy chose"),
     "OrderPromised":          ("policy", "policy.promise_window turned their words into a deadline"),
     "CommitmentMade":         ("policy", "policy.promise_window: their timeframe, capped"),
+    "CommitmentFulfilled":    ("world",  "they did what they said they would"),
     "CommitmentBroken":       ("engine", "the verification time passed and nothing arrived"),
     "OrderSentToSupplier":    ("engine", "performed the action the policy chose"),
     "OrderReceived":          ("world",  "it turned up — nobody was on a call when it did"),

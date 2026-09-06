@@ -1090,3 +1090,44 @@ class TestTheGuardFitsTheConversation(unittest.TestCase):
         from dme.agents import caller
 
         self.assertIn("refusal", inspect.signature(caller._run).parameters)
+
+
+class TestNothingChangesStateOutsideTheLedger(unittest.TestCase):
+    """The claim is that the ledger is the state. This is the test of it.
+
+    Found when the browser started carrying the log between stateless requests:
+    the engine marked a fulfilled commitment by setting a flag rather than
+    emitting an event, so the fulfilment vanished on rebuild and the promise was
+    later reported broken -- after the order had already arrived."""
+
+    def test_a_fulfilled_commitment_survives_a_replay(self):
+        case = fresh()
+        ledger = Ledger(case)
+        now = CLINIC_HOURS.next_open(case.opened_at)
+        ledger.append(
+            ev.CommitmentMade(
+                at=now, commitment_id="cm01", kind=CommitmentKind.SEND_WRITTEN_ORDER,
+                by_party="clinic", promised_by=now, verify_at=now,
+            )
+        )
+        ledger.append(
+            ev.CommitmentFulfilled(
+                at=now, commitment_id="cm01", by_party="clinic",
+                kind=CommitmentKind.SEND_WRITTEN_ORDER,
+            )
+        )
+        self.assertEqual(case.open_commitments(), [])
+
+        rebuilt, _ = load_case()
+        ledger.replay(rebuilt)
+        self.assertEqual(rebuilt.open_commitments(), [], "fulfilment lost on rebuild")
+
+    def test_the_engine_mutates_no_case_state_directly(self):
+        import re
+
+        source = Path("dme/engine.py").read_text(encoding="utf-8")
+        stray = [
+            line.strip() for line in source.splitlines()
+            if re.match(r"\s+(commitment|supplier|task)\.[a-z_]+ = ", line)
+        ]
+        self.assertEqual(stray, [], "state changed outside an event")

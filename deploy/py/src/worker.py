@@ -25,9 +25,9 @@ from workers import Response, WorkerEntrypoint
 
 from dme.llm import CALLER_MODEL, SIM_MODEL
 from dme.loader import default_payload
-from dme.sim.personas import CLINIC_PERSONAS, PERSONAS
+from dme.sim.personas import CLINIC_PERSONAS, DEFAULT_CAST, PERSONAS
 from dme.voice import Voice, voice_for
-from dme.web import run_case_streaming
+from dme.web import run_case_streaming, step_once
 
 JSON_HEADERS = {"Content-Type": "application/json", "Cache-Control": "no-store"}
 
@@ -48,6 +48,8 @@ class Default(WorkerEntrypoint):
 
         if path == "/api/defaults":
             return self.defaults()
+        if path == "/api/step":
+            return await self.step(request)
         if path == "/api/run":
             return await self.run(request)
         if path == "/api/voice":
@@ -59,12 +61,11 @@ class Default(WorkerEntrypoint):
     # ten. Pre-filling all twelve of the brief's suppliers here would guarantee
     # every first run dies two thirds of the way through, so the hosted copy
     # ships a shorter directory and says why.
-    # Two, not three. A supplier call costs about 2 requests per turn plus an
-    # extraction, and a qualifying call runs six turns because there are five
-    # things to ask. Measured against a real run: clinic 11, a hard-no supplier
-    # 5, a qualifying supplier 13, the patient 9, the booking 9 -- 47, with
-    # three to spare. A third supplier is 56 and the case dies on the last call.
-    HOSTED_SUPPLIERS = 2
+    # The whole directory. The free plan's 50-request ceiling is per invocation,
+    # and the browser now drives the loop a step at a time -- so each step gets
+    # its own budget and a case can be any length. Sizing the directory to fit
+    # one request was the old workaround.
+    HOSTED_SUPPLIERS = 12
 
     # And it ships a cast that resolves. The first three of the full deck are a
     # closed panel, a backorder and a phone nobody answers -- so out of the box a
@@ -83,14 +84,9 @@ class Default(WorkerEntrypoint):
     # see the system settle for what is actually available once the directory is
     # exhausted, and the delivery date says so. Every other persona is in the
     # dropdown -- this is only what is pre-filled.
-    HOSTED_CAST = ("closed_panel", "good_but_slow")
+    HOSTED_CAST = DEFAULT_CAST
 
-    # A clinic that sends the order the same day, too. stalls_once is the more
-    # interesting behaviour and it is one dropdown away -- but it costs a broken
-    # promise, two redials, a fax and a human task, and on a 50-request budget
-    # that is the difference between a case that resolves and one that dies on
-    # the last call.
-    HOSTED_CLINIC = "prompt"
+    HOSTED_CLINIC = "stalls_once"
 
     def defaults(self) -> Response:
         payload = default_payload()
@@ -101,14 +97,10 @@ class Default(WorkerEntrypoint):
                 "platform": {
                     "hosted": True,
                     "note": (
-                        f"Cloudflare's free plan allows 50 outbound requests per run and a "
-                        f"supplier call costs about ten, so this is pre-filled with "
-                        f"{self.HOSTED_SUPPLIERS} suppliers — one that turns her away and one "
-                        f"that can help, though not quickly — which resolves end to end with "
-                        f"a little to spare. Add "
-                        f"a third and it will run out partway through: that is the plan, not "
-                        f"the design. Change any persona to see the other behaviours; the "
-                        f"full twelve-row directory runs locally."
+                        "The browser drives this a step at a time, posting the event log back "
+                        "with each request, so the case is rebuilt from its own history every "
+                        "step and can run as long as it needs to on the free plan. The full "
+                        "twelve-row directory takes a couple of minutes."
                     ),
                 },
                 "default_cast": list(self.HOSTED_CAST),
@@ -121,6 +113,29 @@ class Default(WorkerEntrypoint):
                 "voice_available": bool(self._secret("SARVAM_API_KEY")),
             }
         )
+
+    async def step(self, request) -> Response:
+        """One step per request, so each gets its own subrequest budget.
+
+        The free plan allows 50 outbound requests per invocation and a whole
+        case needs several hundred. One step needs about thirteen, and the
+        browser holds the ledger between them -- which the event-sourced design
+        makes safe, because folding the same events yields the same case.
+        """
+        api_key = self._secret("GROQ_API_KEY")
+        if not api_key:
+            return json_response({"error": "GROQ_API_KEY is not set on this Worker"}, 500)
+        try:
+            payload = json.loads(await request.text())
+        except Exception as exc:
+            return json_response({"error": f"bad body: {exc}"}, 400)
+        payload.setdefault("config", {}).setdefault("models", {})
+        payload["config"]["api_key"] = api_key
+        try:
+            return json_response(await step_once(payload))
+        except Exception as exc:
+            traceback.print_exc()
+            return json_response({"error": f"{type(exc).__name__}: {exc}"})
 
     async def run(self, request) -> Response:
         """Stream the run as newline-delimited JSON while it happens."""

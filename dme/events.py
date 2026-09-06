@@ -165,6 +165,16 @@ class CommitmentMade(Event):
 
 
 @dataclass(frozen=True)
+class CommitmentFulfilled(Event):
+    commitment_id: str = ""
+    by_party: str = ""
+    kind: CommitmentKind = CommitmentKind.CALL_US_BACK
+
+    def line(self) -> str:
+        return f"{self.by_party} did what they said they would"
+
+
+@dataclass(frozen=True)
 class CommitmentBroken(Event):
     commitment_id: str = ""
     by_party: str = ""

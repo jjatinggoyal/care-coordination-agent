@@ -71,6 +71,10 @@ class Engine:
 
     def __post_init__(self) -> None:
         self.ledger = Ledger(self.case)
+        # The world holds no state of its own; everything it needs to remember it
+        # reads out of the case, which is what lets both be rebuilt from the
+        # ledger alone.
+        self.world.case = self.case
 
     # --- plumbing ----------------------------------------------------------
 
@@ -152,9 +156,21 @@ class Engine:
         arrived, coded = self.world.order_has_arrived(self.clock.now)
         if arrived and self.case.order.status is not OrderStatus.RECEIVED:
             self.emit(ev.OrderReceived(at=self.clock.now, coded_as=coded))
+            # Emit it rather than setting the flag. A mutation made outside the
+            # ledger survives inside one process and vanishes the moment the case
+            # is rebuilt from its events -- which is exactly what happens now
+            # that the browser carries the log between requests. It showed up as
+            # a promise being marked broken after the order had already arrived.
             for commitment in self.case.open_commitments():
                 if commitment.kind is CommitmentKind.SEND_WRITTEN_ORDER:
-                    commitment.fulfilled = True
+                    self.emit(
+                        ev.CommitmentFulfilled(
+                            at=self.clock.now,
+                            commitment_id=commitment.commitment_id,
+                            by_party=commitment.by_party,
+                            kind=commitment.kind,
+                        )
+                    )
 
     def _expire_commitments(self) -> None:
         now = self.clock.now

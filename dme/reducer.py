@@ -104,6 +104,9 @@ def apply(case: Case, event: ev.Event) -> None:
                 verify_at=event.verify_at or event.at,
             )
 
+        case ev.CommitmentFulfilled():
+            case.commitments[event.commitment_id].fulfilled = True
+
         case ev.CommitmentBroken():
             commitment = case.commitments[event.commitment_id]
             commitment.broken = True

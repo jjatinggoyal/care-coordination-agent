@@ -327,6 +327,14 @@ async def _run(
         finished = END in ours
         spoken = ours.replace(END, "").strip()
 
+        # The model sometimes asks a question and marks the call finished in the
+        # same turn, so the transcript ends on us talking into a dead line -- and
+        # the answer we just asked for is lost, usually the delivery lead time,
+        # which then costs a whole callback. If it is still asking, it is not
+        # done; let them answer. MAX_TURNS remains the real stop.
+        if finished and spoken.rstrip().endswith("?"):
+            finished = False
+
         # The guard. A turn that states an identifier we were never given does
         # not go down the line -- it is replaced by what a careful coordinator
         # would actually say. Recorded, because the rate is worth watching.

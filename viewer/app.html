@@ -260,22 +260,52 @@ async function run() {
   RUN = { case: {}, suppliers: [], steps: [], frames: [], calls: {}, messages: [], outcome: null, usage: {} };
   Viewer.init(RUN, { follow: true, onVoice: speak, voiceAvailable: () => voiceAvailable });
 
+  // One request per step, each with its own subrequest budget, and the ledger
+  // rides along in the browser between them. That is only safe because folding
+  // the same events rebuilds the same case -- the event log is the state.
+  RUN.case = {
+    patient: config.case.patient, equipment: config.case.equipment,
+    hcpcs: config.case.hcpcs, pcp: config.case.pcp_name + ", " + config.case.pcp_practice,
+    opened_at: config.case.opened_at, assumptions: config.case.assumptions || [],
+    world: "clinic: " + config.world.clinic + " · seed " + config.world.seed,
+  };
+  RUN.suppliers = config.case.suppliers.map((s, i) => ({
+    id: "s" + String(i + 1).padStart(2, "0"), name: s.name, phone: s.phone, address: s.address,
+  }));
+
+  let events = [], now = null, requests = 0;
   try {
-    const response = await fetch("/api/run", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config),
-    });
-    if (!response.ok) throw new Error(await response.text());
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop();
-      for (const line of lines) {
-        if (line.trim()) handle(JSON.parse(line));
+    for (let guard = 0; guard < 120; guard++) {
+      const response = await fetch("/api/step", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config, events, now }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const d = await response.json();
+      requests += 1;
+      if (d.error) { setStatus("failed: " + d.error, true); break; }
+
+      events = events.concat(d.events);
+      now = d.now;
+      if (d.assumptions && d.assumptions.length) RUN.case.assumptions = d.assumptions;
+      (d.calls || []).forEach(c => { RUN.calls[c.id] = Object.assign(RUN.calls[c.id] || {}, c); });
+      Object.entries(d.notes || {}).forEach(([id, n]) => {
+        RUN.calls[id] = Object.assign(RUN.calls[id] || {}, n);
+      });
+      (d.steps || []).forEach(m => { RUN.steps.push(m.step); RUN.frames.push(m.frame); });
+      RUN.usage = d.usage || RUN.usage;
+      Viewer.refresh(false);
+      setStatus(RUN.steps.length + " decisions · " + Object.keys(RUN.calls).length
+                + " calls · " + requests + " requests");
+
+      if (d.done) {
+        RUN.outcome = d.outcome;
+        Viewer.setFollow(false);
+        Viewer.refresh(true);
+        setStatus(d.outcome && d.outcome.resolved ? "resolved with no human involved"
+          : d.outcome && d.outcome.escalation ? "escalated: " + d.outcome.escalation
+          : "finished");
+        break;
       }
     }
   } catch (e) {
@@ -283,39 +313,6 @@ async function run() {
   } finally {
     running = false;
     $("#run").disabled = false;
-  }
-}
-
-function handle(msg) {
-  switch (msg.t) {
-    case "case":
-      RUN.case = msg.case; RUN.suppliers = msg.suppliers;
-      setStatus("working the case…");
-      break;
-    case "step":
-      RUN.steps.push(msg.step); RUN.frames.push(msg.frame);
-      Viewer.refresh(false);
-      setStatus(RUN.steps.length + " decisions · " + Object.keys(RUN.calls).length + " calls");
-      break;
-    case "call":
-      RUN.calls[msg.id] = msg.call;
-      break;
-    case "callnote":
-      Object.assign(RUN.calls[msg.id] || (RUN.calls[msg.id] = {}), msg.note);
-      break;
-    case "message":
-      RUN.messages.push(msg.message);
-      break;
-    case "done":
-      RUN.outcome = msg.outcome; RUN.usage = msg.usage;
-      Viewer.setFollow(false);
-      Viewer.refresh(true);
-      setStatus(msg.outcome.resolved ? "resolved with no human involved"
-        : msg.outcome.escalation ? "escalated: " + msg.outcome.escalation : "stalled");
-      break;
-    case "error":
-      setStatus("failed: " + msg.message, true);
-      break;
   }
 }
 

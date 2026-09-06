@@ -6,13 +6,20 @@ whether Eleanor picks up. The system can only learn any of it by placing a call
 and listening to the answer -- which is the honest shape of a problem where the
 integration surface is a telephone.
 
-Randomness is seeded. The same seed gives the same world twice, so a run that
-goes wrong can be re-run and watched.
+The world holds no mutable state. Whether a phone is answered is a hash of the
+seed, who is being rung, and which attempt this is -- so it is stable for a given
+seed but carries nothing forward, and everything else it needs to know it reads
+out of the case.
+
+That is what lets a case run across many stateless requests: the browser holds
+the ledger, and both the case and the world can be rebuilt exactly from it. The
+same seed gives the same world twice, so a run that goes wrong can be re-run and
+watched.
 """
 
 from __future__ import annotations
 
-import random
+import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -57,25 +64,27 @@ class World:
     practice: str = "the practice"
     equipment: str = "the equipment"
 
-    rng: random.Random = field(init=False)
     supplier_personas: dict[str, SupplierPersona] = field(default_factory=dict, init=False)
-    clinic_calls: int = field(default=0, init=False)
-    order_arrives_at: datetime | None = field(default=None, init=False)
-    order_coded_as: str = field(default="", init=False)
-    patient_contacts: int = field(default=0, init=False)
-    # Human steps we have been asked for: task_id -> when a person gets to it.
-    human_queue: dict[str, datetime] = field(default_factory=dict, init=False)
-    human_done: set[str] = field(default_factory=set, init=False)
+    # The case this world is simulating around. Set by the engine; everything the
+    # world needs to remember, it reads from here rather than holding itself.
+    case: object | None = field(default=None, init=False, repr=False)
 
-    def __post_init__(self) -> None:
-        self.rng = random.Random(self.seed)
+    def luck(self, *key) -> float:
+        """A stable number in [0, 1) for this seed and this question.
+
+        Replaces a random.Random whose internal state would have had to be
+        carried between requests. Same inputs, same answer, no memory.
+        """
+        raw = f"{self.seed}|" + "|".join(str(k) for k in key)
+        digest = hashlib.sha256(raw.encode()).digest()
+        return int.from_bytes(digest[:8], "big") / 2**64
 
     # --- casting -----------------------------------------------------------
 
     def assign(self, supplier_ids: list[str], shuffle: bool = False) -> None:
         keys = list(self.cast)
         if shuffle:
-            self.rng.shuffle(keys)
+            keys.sort(key=lambda k: self.luck("cast", k))
         for i, supplier_id in enumerate(supplier_ids):
             chosen = (self.assigned or {}).get(supplier_id)
             if chosen in (None, "", "random"):
@@ -94,22 +103,24 @@ class World:
 
     def dial_supplier(self, supplier_id: str) -> CallOutcome:
         persona = self.supplier_personas[supplier_id]
-        if self.rng.random() < persona.pickup_rate:
+        attempt = len(self.case.suppliers[supplier_id].attempts) if self.case else 0
+        if self.luck("dial", supplier_id, attempt) < persona.pickup_rate:
             return CallOutcome.ANSWERED
-        if self.rng.random() < persona.voicemail_rate:
+        if self.luck("vm", supplier_id, attempt) < persona.voicemail_rate:
             return CallOutcome.VOICEMAIL
         return CallOutcome.NO_ANSWER
 
     def dial_clinic(self) -> CallOutcome:
-        if self.rng.random() < self.clinic.pickup_rate:
+        attempt = len(self.case.order.attempts) if self.case else 0
+        if self.luck("dial", "clinic", attempt) < self.clinic.pickup_rate:
             return CallOutcome.ANSWERED
         return CallOutcome.NO_ANSWER
 
     def dial_patient(self) -> CallOutcome:
-        self.patient_contacts += 1
-        if self.patient_contacts < self.patient_answers_after:
+        attempt = self.case.patient_track.contact_attempts if self.case else 0
+        if attempt + 1 < self.patient_answers_after:
             return CallOutcome.NO_ANSWER
-        if self.rng.random() < self.patient.pickup_rate:
+        if self.luck("dial", "patient", attempt) < self.patient.pickup_rate:
             return CallOutcome.ANSWERED
         return CallOutcome.NO_ANSWER
 
@@ -234,56 +245,72 @@ class World:
     # --- things that happen later, without anyone on the phone ---------------
 
     def clinic_call_finished(self, at: datetime, promised: bool) -> None:
-        """Decide -- out of the system's sight -- whether the order actually moves."""
-        self.clinic_calls += 1
+        """Nothing to record -- when the order moves is derived, not remembered."""
+
+    def _order_arrival(self) -> tuple[datetime | None, str]:
+        """When the written order lands, read out of the case rather than stored.
+
+        Three ways it can move, in the order they are tried: a person was asked
+        to hand it over; it was faxed; or somebody promised it on a call. The
+        stalling front desk means the promise only counts from the second time
+        they answered the phone.
+        """
         clinic = self.clinic
-        if not clinic.sends_order or not promised:
-            return
-        if clinic.promises_but_stalls and self.clinic_calls == 1:
-            return  # they meant it at the time. It still did not happen.
-        if self.order_arrives_at is None:
-            self.order_arrives_at = CLINIC_HOURS.add_business_hours(
-                at, max(1.0, clinic.business_days_to_send * 8.0)
+        coded = clinic.miscodes_as or self.hcpcs
+        if self.case is None or not clinic.sends_order:
+            return None, coded
+
+        for task in self.case.human_tasks.values():
+            if task.completed_at is not None:
+                return CLINIC_HOURS.add_business_hours(task.completed_at, 4.0), coded
+
+        if self.case.order.faxed_at is not None:
+            return CLINIC_HOURS.add_business_hours(self.case.order.faxed_at, 8.0), coded
+
+        answered = [a for a in self.case.order.attempts if a.outcome is CallOutcome.ANSWERED]
+        needed = 2 if clinic.promises_but_stalls else 1
+        if len(answered) >= needed:
+            return (
+                CLINIC_HOURS.add_business_hours(
+                    answered[needed - 1].at, max(1.0, clinic.business_days_to_send * 8.0)
+                ),
+                coded,
             )
-            self.order_coded_as = clinic.miscodes_as or self.hcpcs
+        return None, coded
 
     def order_has_arrived(self, now: datetime) -> tuple[bool, str]:
-        if self.order_arrives_at is not None and now >= self.order_arrives_at:
-            return True, self.order_coded_as
+        arrives_at, coded = self._order_arrival()
+        if arrives_at is not None and now >= arrives_at:
+            return True, coded
         return False, ""
 
     def fax_received(self, at: datetime) -> None:
-        """A fax gets read by whoever opens the tray. Some practices never do."""
-        clinic = self.clinic
-        if clinic.sends_order and self.order_arrives_at is None:
-            self.order_arrives_at = CLINIC_HOURS.add_business_hours(at, 8.0)
-            self.order_coded_as = clinic.miscodes_as or self.hcpcs
+        """Nothing to record; _order_arrival reads order.faxed_at off the case."""
 
     def human_task_queued(self, task_id: str, at: datetime) -> None:
-        """A person has been asked. They are not instant, and they are not the
-        system -- so this lives in the world, not in the engine."""
-        self.human_queue[task_id] = CLINIC_HOURS.add_business_days(
-            at, max(0, self.human_turnaround_days)
-        )
+        """Nothing to record; when a person gets to it is derived from requested_at."""
 
     def human_tasks_done(self, now: datetime) -> list[tuple[str, str]]:
         """Which asked-for steps a person has finished by now."""
+        if self.case is None:
+            return []
         finished = []
-        for task_id, when in self.human_queue.items():
-            if task_id not in self.human_done and now >= when:
-                self.human_done.add(task_id)
-                finished.append((task_id, "handled by the care team"))
+        for task in self.case.human_tasks.values():
+            if not task.open:
+                continue
+            due = CLINIC_HOURS.add_business_days(
+                task.requested_at, max(0, self.human_turnaround_days)
+            )
+            if now >= due:
+                finished.append((task.task_id, "handled by the care team"))
         return finished
 
     def human_task_finished_order(self, now: datetime) -> None:
-        """A posted request eventually produces the written order."""
-        if self.order_arrives_at is None and self.clinic.sends_order:
-            self.order_arrives_at = CLINIC_HOURS.add_business_hours(now, 4.0)
-            self.order_coded_as = self.clinic.miscodes_as or self.hcpcs
+        """Nothing to record; _order_arrival sees the completed task."""
 
     def patient_picks_up(self) -> bool:
-        self.patient_contacts += 1
-        return self.patient_contacts >= self.patient_answers_after
+        attempt = self.case.patient_track.contact_attempts if self.case else 0
+        return attempt + 1 >= self.patient_answers_after
 
     def booking_holds(self, supplier_id: str) -> bool:
         """Does a supplier who agreed to a delivery slot actually book it?"""

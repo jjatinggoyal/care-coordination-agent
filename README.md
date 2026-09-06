@@ -21,18 +21,17 @@ Fill in a case and press **Run**; it works the case live, in front of you.
 - Change anything: the patient, the equipment, the directory, when the case
   opens, who's on the other end of each phone.
 
-It's pre-filled to **resolve end to end** out of the box: one supplier who turns
-her away, one who can help but is three weeks out, and a clinic that sends the
-order. So the default shows the system settling for what's actually available
-once the directory is exhausted — the delivery date says so. Change any of it;
-every persona is in the dropdown.
+It's pre-filled with **the brief's full twelve-supplier directory** and resolves
+end to end in about two minutes. Change any of it; every persona is in the
+dropdown.
 
-**One caveat.** It's on Cloudflare's free plan, which allows 50 outbound requests
-per run, and a qualifying supplier call costs about thirteen. Two suppliers plus
-the clinic, the patient and the booking comes to 47; a third makes it 56 and the
-case dies on the last call. So the hosted copy ships two and says so in the form.
-The brief's full twelve-row directory runs locally, where there's no such limit —
-it's a plan setting, not a design one.
+**How it fits on a free plan.** Cloudflare allows 50 outbound requests per
+*invocation*, and a whole case needs several hundred. So the browser drives the
+loop: one request per `engine.step()`, each with its own budget, with the event
+log riding along between them. That works because **the ledger already is the
+state** — folding the same events rebuilds the same case, so both the case and
+the simulated world are reconstructed from history on every request and nothing
+is held server-side. A full run is ~29 requests carrying ~52 events.
 
 There's also [a finished twelve-supplier
 run](https://dme-replay.jatingoyal.com) you can scrub
@@ -92,7 +91,11 @@ the result becomes an Event           the only way state ever changes
 reducer folds it into state           provenance attached here
 ```
 
-- State is a fold of history; `ledger.replay()` rebuilds it exactly.
+- State is a fold of history; `ledger.replay()` rebuilds it exactly — which is
+  what lets the hosted copy run a case across ~29 stateless HTTP requests, the
+  browser carrying the log and the server holding nothing.
+- The simulated world is stateless too: whether a phone is answered is a hash of
+  `(seed, who, attempt)`, and everything else it needs it reads off the case.
 - Nothing is scheduled. Retry times are *derived* from call history each step —
   no timer can drift or leak.
 - **Ten typed actions** are the entire vocabulary between decision and effect.

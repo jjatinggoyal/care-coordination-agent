@@ -23,7 +23,9 @@ from pathlib import Path
 from . import events as ev
 from . import policy
 from .clock import CENTRAL, Clock
+from .codec import dump_ledger, load_ledger
 from .engine import Engine
+from .reducer import apply as reducer_apply
 from .export import MODEL_TOUCHED, _frame, attribute
 from .llm import CALLER_MODEL, SIM_MODEL, LLM, SubrequestLimit, load_env
 from .loader import default_payload
@@ -74,6 +76,115 @@ def _step_from_event(event: ev.Event) -> dict:
         "model": event.kind in MODEL_TOUCHED,
         "by": attribute("event", event.kind)[0],
         "attribution": attribute("event", event.kind)[1],
+    }
+
+
+async def step_once(payload: dict) -> dict:
+    """Advance one configured case by exactly one step, holding nothing.
+
+    The caller keeps the event log and posts it back; this rebuilds the case by
+    folding it, rebuilds the world around that case, takes one step, and returns
+    whatever new events came out. Nothing is remembered between calls.
+
+    That is possible only because the ledger already is the state -- and it is
+    necessary because a Cloudflare Worker on the free plan allows 50 outbound
+    requests per invocation. A whole case needs more; one step needs about
+    thirteen.
+    """
+    from .loader import build_case
+    from .sim.world import World
+
+    config = payload.get("config") or {}
+    case, assumptions = build_case(config.get("case") or {})
+    if not case.suppliers:
+        return {"error": "the directory is empty — add at least one supplier"}
+
+    prior = load_ledger(payload.get("events") or [])
+    for event in prior:
+        reducer_apply(case, event)
+    case.seq = len(prior)
+
+    world_config = config.get("world") or {}
+    models = config.get("models") or {}
+    clinic_key = world_config.get("clinic") or "stalls_once"
+
+    llm = LLM(model=models.get("caller") or None, api_key=config.get("api_key"))
+    now = payload.get("now")
+    clock = Clock(now=datetime.fromisoformat(now) if now else case.opened_at)
+
+    world = World(
+        llm=llm,
+        seed=int(world_config.get("seed") or 7),
+        clinic_persona_key=clinic_key,
+        patient_answers_after=int(world_config.get("patient_answers_after") or 1),
+        patient_accepts_cost=bool(world_config.get("patient_accepts_cost", True)),
+        assigned=world_config.get("personas") or None,
+        sim_model=models.get("sim") or SIM_MODEL,
+        hcpcs=case.hcpcs,
+        patient_name=case.patient.name,
+        pcp_name=case.pcp_name,
+        practice=case.pcp_practice,
+        equipment=case.equipment,
+    )
+    world.assign(list(case.suppliers))
+
+    engine = Engine(case=case, world=world, llm=llm, clock=clock)
+    # Call ids continue from where the log left off, so c07 is still c07.
+    engine._calls = sum(1 for e in prior if getattr(e, "call_id", None))
+
+    steps: list[dict] = []
+    engine.on_action = lambda a: steps.append(
+        {"t": "step", "step": _step_from_action(a, clock.now), "frame": _frame(case)}
+    )
+    engine.on_event = lambda e: steps.append(
+        {"t": "step", "step": _step_from_event(e), "frame": _frame(case)}
+    )
+    calls: list[dict] = []
+    engine.on_transcript = lambda label, t: calls.append(
+        {
+            "id": (label or "").split(" ")[0] or t.call_id,
+            "with": label.split("—")[-1].strip() if "—" in label else label,
+            "lines": [{"who": w, "text": txt} for w, txt in t.lines],
+            "blocked": list(t.blocked),
+        }
+    )
+
+    try:
+        alive = await engine.step()
+    except SubrequestLimit:
+        return {"error": (
+            "This Worker ran out of its per-invocation request budget inside a single "
+            "step, which should not happen — try a shorter directory."
+        )}
+    except Exception as exc:
+        traceback.print_exc()
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+    elapsed = clock.now - case.opened_at
+    return {
+        "events": dump_ledger(engine.ledger.events),
+        "now": _iso(clock.now),
+        "steps": steps,
+        "calls": calls,
+        "notes": engine.call_notes,
+        "assumptions": assumptions,
+        "done": not alive,
+        "outcome": {
+            "status": case.status.value,
+            "resolved": case.status.value == "closed_delivered",
+            "escalation": case.escalation.reason if case.escalation else None,
+            "packet": case.escalation.packet if case.escalation else None,
+            "delivery_at": _iso(case.delivery_scheduled_for),
+            "elapsed_days": round(elapsed.days + elapsed.seconds / 86400, 2),
+            "calls_placed": engine.calls_placed,
+            "vetoed": engine.vetoed_answers,
+            "blocked": engine.fabrications_blocked,
+            "stall_note": engine.stall_note,
+        } if not alive else None,
+        "usage": {
+            "calls": llm.usage.calls, "by_role": llm.usage.by_role,
+            "input_tokens": llm.usage.input_tokens, "output_tokens": llm.usage.output_tokens,
+        },
     }
 
 
@@ -265,6 +376,8 @@ class Handler(SimpleHTTPRequestHandler):
         route = self.path.split("?", 1)[0]
         if route == "/api/voice":
             return self._voice()
+        if route == "/api/step":
+            return self._step()
         if route == "/api/run":
             return self._run()
         return self._json(404, {"error": "not found"})
@@ -288,6 +401,18 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as exc:
             return self._json(200, {"error": str(exc)})
         return self._json(200, {"audio": base64.b64encode(audio).decode()})
+
+    def _step(self) -> None:
+        """One step of a case, holding nothing between requests."""
+        try:
+            payload = self._body()
+        except (ValueError, json.JSONDecodeError) as exc:
+            return self._json(400, {"error": str(exc)})
+        try:
+            return self._json(200, asyncio.run(step_once(payload)))
+        except Exception as exc:
+            traceback.print_exc()
+            return self._json(200, {"error": f"{type(exc).__name__}: {exc}"})
 
     def _run(self) -> None:
         """Stream the run as newline-delimited JSON while it happens."""
