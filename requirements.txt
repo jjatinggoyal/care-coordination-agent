@@ -1,0 +1,10 @@
+# Nothing. The system runs on the Python standard library alone.
+#
+# It used to need the `openai` SDK. That SDK wants sockets, and Cloudflare
+# Workers do not have any -- outbound HTTP there is `fetch`. Since the whole
+# request is one POST with a JSON body, dme/llm.py makes it by hand and picks a
+# transport at import: `fetch` inside a Worker, urllib on a real machine. Forty
+# lines, and the same codebase runs in both places.
+#
+# Local development needs only Python 3.12+.
+# Deploying the Worker additionally needs `uv` and Node (see deploy/README.md).

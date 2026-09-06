@@ -1,0 +1,23 @@
+{
+  "case_id": "case-eleanor-001",
+  "opened_at": "2026-09-03T02:14:00-05:00",
+  "patient": {
+    "name": "Eleanor Martinez",
+    "age": 72,
+    "coverage": "Original Medicare (Part B)",
+    "has_supplemental": false,
+    "zip_code": "60614",
+    "zip_is_assumed": true,
+    "phone": "(312) 555-0113"
+  },
+  "equipment": "Standard manual wheelchair",
+  "hcpcs": "K0001",
+  "pcp_name": "Dr. Sarah Chen",
+  "pcp_practice": "Sunrise Family Medicine",
+  "pcp_phone": "(312) 555-0198",
+  "assumptions": [
+    "zip_code: the brief gives Dr. Chen's practice location but never Eleanor's address. 'Does this supplier deliver to her?' is a gate we cannot evaluate without one, so 60614 is assumed and flagged. In a real intake this field is captured; here it is invented, and the code says so rather than hiding it.",
+    "phone: not supplied in the brief. Invented, in the same 555 range as the rest of the fixtures.",
+    "opened_at: 02:14 on a Thursday. Chosen literally -- 'with the care advocate asleep' means every organisation this case needs is shut when it opens."
+  ]
+}

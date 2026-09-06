@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+runs/
+
+# the built static site — rebuilt from a run document
+deploy/public/
+deploy/py/src/dme/
+deploy/py/.venv-workers/
+deploy/py/node_modules/
+deploy/py/uv.lock
+deploy/py/.wrangler/
+deploy/py/public/
+deploy/py/.dev.vars
+deploy/py/python_modules/
+deploy/py/*.dist-info/
+.wrangler/
