@@ -25,13 +25,9 @@ It's pre-filled with **the brief's full twelve-supplier directory** and resolves
 end to end in about two minutes. Change any of it; every persona is in the
 dropdown.
 
-**How it fits on a free plan.** Cloudflare allows 50 outbound requests per
-*invocation*, and a whole case needs several hundred. So the browser drives the
-loop: one request per `engine.step()`, each with its own budget, with the event
-log riding along between them. That works because **the ledger already is the
-state** — folding the same events rebuilds the same case, so both the case and
-the simulated world are reconstructed from history on every request and nothing
-is held server-side. A full run is ~29 requests carrying ~52 events.
+The browser drives the run a step at a time, carrying the event log between
+requests — so the server holds nothing and the case is rebuilt from its own
+history each step. A full twelve-supplier case takes a couple of minutes.
 
 There's also [a finished twelve-supplier
 run](https://dme-replay.jatingoyal.com) you can scrub
@@ -92,8 +88,8 @@ reducer folds it into state           provenance attached here
 ```
 
 - State is a fold of history; `ledger.replay()` rebuilds it exactly — which is
-  what lets the hosted copy run a case across ~29 stateless HTTP requests, the
-  browser carrying the log and the server holding nothing.
+  what lets a case run across ~29 stateless requests, the browser carrying the
+  log and the server holding nothing between steps.
 - The simulated world is stateless too: whether a phone is answered is a hash of
   `(seed, who, attempt)`, and everything else it needs it reads off the case.
 - Nothing is scheduled. Retry times are *derived* from call history each step —

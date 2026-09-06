@@ -93,7 +93,9 @@ const Viewer = (() => {
     add("phone calls", o ? o.calls_placed : Object.keys(RUN.calls || {}).length,
         (RUN.suppliers || []).length + " suppliers in the directory");
     add("model calls", u.calls || 0,
-        u.input_tokens ? ((u.input_tokens / 1000).toFixed(0) + "k in / " + (u.output_tokens / 1000).toFixed(0) + "k out") : "—");
+        u.calls ? ((u.input_tokens / 1000).toFixed(0) + "k in / "
+                   + (u.output_tokens / 1000).toFixed(0) + "k out")
+                : "none yet");
     const vetoed = o ? o.vetoed : Object.values(RUN.calls || {}).reduce((n, c) => n + ((c.dropped || []).length), 0);
     add("answers vetoed", vetoed, vetoed ? "quoted but not in the call" : "every fact traced to a quote");
     const blocked = o ? (o.blocked || 0)

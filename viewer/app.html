@@ -271,7 +271,8 @@ async function run() {
   setStatus("starting…");
 
   const config = readForm();
-  RUN = { case: {}, suppliers: [], steps: [], frames: [], calls: {}, messages: [], outcome: null, usage: {} };
+  RUN = { case: {}, suppliers: [], steps: [], frames: [], calls: {}, messages: [], outcome: null,
+          usage: { calls: 0, input_tokens: 0, output_tokens: 0, by_role: {} } };
   Viewer.init(RUN, { follow: true, onVoice: speak, voiceAvailable: () => voiceAvailable });
 
   // One request per step, each with its own subrequest budget, and the ledger
@@ -311,7 +312,18 @@ async function run() {
         RUN.calls[id] = Object.assign(RUN.calls[id] || {}, n);
       });
       (d.steps || []).forEach(m => { RUN.steps.push(m.step); RUN.frames.push(m.frame); });
-      RUN.usage = d.usage || RUN.usage;
+      // Every step is a fresh server invocation with a fresh usage counter, so
+      // these accumulate here. Replacing rather than adding showed the last
+      // step's usage -- and the last step closes the case without calling a
+      // model at all, so the tile read zero.
+      const u = d.usage || {};
+      RUN.usage.calls = (RUN.usage.calls || 0) + (u.calls || 0);
+      RUN.usage.input_tokens = (RUN.usage.input_tokens || 0) + (u.input_tokens || 0);
+      RUN.usage.output_tokens = (RUN.usage.output_tokens || 0) + (u.output_tokens || 0);
+      RUN.usage.by_role = RUN.usage.by_role || {};
+      Object.entries(u.by_role || {}).forEach(([role, n]) => {
+        RUN.usage.by_role[role] = (RUN.usage.by_role[role] || 0) + n;
+      });
       Viewer.refresh(false);
       setStatus(RUN.steps.length + " decisions · " + Object.keys(RUN.calls).length
                 + " calls · " + requests + " requests");
