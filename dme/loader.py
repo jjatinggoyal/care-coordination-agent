@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from .clock import CENTRAL
@@ -105,8 +105,27 @@ def build_case(payload: dict) -> tuple[Case, list[str]]:
     return case, list(payload.get("assumptions") or [])
 
 
+def most_recent_overnight(hour: int = 2, minute: int = 14) -> datetime:
+    """The last 02:14 that has been and gone, in Chicago.
+
+    The form should not open on a date from whenever the fixture was written.
+    But it should not open on *now* either: 02:14 is the whole reason the
+    business-hours logic is visible -- "with the care advocate asleep" means
+    everything the case needs is shut when it opens, and starting at three on a
+    Tuesday afternoon quietly removes that. So: today's date, that hour.
+    """
+    now = datetime.now(CENTRAL)
+    opened = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return opened if opened <= now else opened - timedelta(days=1)
+
+
 def default_payload(path: Path | None = None, suppliers_path: Path | None = None) -> dict:
-    """The brief's own case, as a payload the form can be pre-filled from."""
+    """The brief's own case, as a payload the form can be pre-filled from.
+
+    Dated to this morning rather than to the fixture, so the demo is never
+    opening on a stale date. `load_case` keeps the fixture's fixed date, because
+    the tests and the sample runs need to be reproducible.
+    """
     blob = json.loads(
         path.read_text(encoding="utf-8") if path else read_data("case_eleanor.json")
     )
@@ -117,6 +136,7 @@ def default_payload(path: Path | None = None, suppliers_path: Path | None = None
     p = blob["patient"]
     p.setdefault("zip_code", p.get("zip", ""))
     p.setdefault("zip_is_assumed", p.get("zip_assumed", False))
+    blob["opened_at"] = most_recent_overnight().isoformat()
     return blob
 
 

@@ -18,6 +18,6 @@
   "assumptions": [
     "zip_code: the brief gives Dr. Chen's practice location but never Eleanor's address. 'Does this supplier deliver to her?' is a gate we cannot evaluate without one, so 60614 is assumed and flagged. In a real intake this field is captured; here it is invented, and the code says so rather than hiding it.",
     "phone: not supplied in the brief. Invented, in the same 555 range as the rest of the fixtures.",
-    "opened_at: 02:14 on a Thursday. Chosen literally -- 'with the care advocate asleep' means every organisation this case needs is shut when it opens."
+    "opened_at: 02:14, before anything opens. Chosen literally -- 'with the care advocate asleep' means every organisation this case needs is shut when the case starts."
   ]
 }
