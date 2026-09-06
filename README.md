@@ -46,7 +46,7 @@ Other ways in:
 ```sh
 python3 scripts/run_case.py --transcripts   # the brief's case, in the terminal
 python3 scripts/run_eval.py -n 6            # the sweep: six seeded worlds
-python3 -m unittest discover -s tests       # 84 tests, no API key needed
+python3 -m unittest discover -s tests       # 86 tests, no API key needed
 ```
 
 That the tests need no API key is the whole architectural claim, demonstrated.
@@ -114,11 +114,11 @@ enforce both.
 A sixth call site, `sim/world.py`, plays the humans. Scaffolding, not product:
 
 ```
-182 model calls — caller=80, extractor=22, sim_supplier=67, sim_clinic=6, sim_patient=7
+100 model calls — caller=45, extractor=10, sim_supplier=25, sim_patient=12, sim_clinic=8
 ```
 
-**102 of 182 are the system; 80 are the world pretending to be people.** In
-production those 80 are humans on real phones.
+**55 of 100 are the system; 45 are the world pretending to be people.** In
+production those 45 are humans on real phones.
 
 **Six things keep the boundary honest:**
 
@@ -143,12 +143,18 @@ production those 80 are humans on real phones.
 | | |
 |---|---|
 | resolved with no human | **4 / 6** |
-| median simulated days · phone calls | 4.3 · 18 |
+| median simulated days · phone calls | 4.3 · 10 |
+| answers vetoed as ungrounded | 1 |
 | escalations | `order_unobtainable`, `order_coding_mismatch` |
 
-- Both escalations are **correct**, not failures.
-- Calls per case went **up** over the build, 14 → 18, deliberately — asking how
-  fast each supplier is stopped it booking a three-week delivery by accident.
+- Both escalations are **correct**, not failures. One world's clinic never routes
+  the request to anyone who can act on it; the other returns an order coded
+  K0003, and a coding correction changes what the patient owes.
+- **Calls per case went 14 → 18 → 10 over the build.** Up, because asking every
+  supplier how fast they are is what stopped it booking a three-week delivery by
+  accident. Then down, and further than it started, once I noticed the agent was
+  ending about a third of its calls by asking a question and hanging up in the
+  same turn — losing the answer and paying for a callback to re-ask it.
 
 ---
 
