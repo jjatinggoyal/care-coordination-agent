@@ -1131,3 +1131,16 @@ class TestNothingChangesStateOutsideTheLedger(unittest.TestCase):
             if re.match(r"\s+(commitment|supplier|task)\.[a-z_]+ = ", line)
         ]
         self.assertEqual(stray, [], "state changed outside an event")
+
+
+class TestEveryCallIsReachableFromTheFeed(unittest.TestCase):
+    """The patient's call was recorded but not linked. Its event carried no
+    call_id -- left over from when she was reached by message rather than by
+    phone -- so the row in the feed had nothing to open."""
+
+    def test_every_event_that_follows_a_call_carries_its_id(self):
+        import dataclasses
+
+        for cls in (ev.SupplierCalled, ev.ClinicCalled, ev.PatientContacted):
+            names = [f.name for f in dataclasses.fields(cls)]
+            self.assertIn("call_id", names, f"{cls.__name__} cannot be linked to its transcript")

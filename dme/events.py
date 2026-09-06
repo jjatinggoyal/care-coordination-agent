@@ -188,6 +188,10 @@ class CommitmentBroken(Event):
 class PatientContacted(Event):
     topic: str = ""
     delivered: bool = True
+    # Carries the transcript id like every other call. It did not, from when the
+    # patient was reached by message rather than by phone, so the feed row had
+    # nothing to open and clicking it did nothing.
+    call_id: str = ""
 
     def line(self) -> str:
         return f"patient contacted: {self.topic}"

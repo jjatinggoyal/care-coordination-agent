@@ -454,6 +454,7 @@ class Engine:
 
         outcome = self.world.dial_patient()
         if outcome is not CallOutcome.ANSWERED:
+            # No transcript to link to -- nobody picked up.
             self.emit(ev.PatientContacted(at=now, topic=action.topic, delivered=False))
             self.clock.advance(timedelta(hours=3))
             return True
@@ -464,7 +465,7 @@ class Engine:
                 supplier_name=supplier.name if supplier else "",
                 when=self.case.delivery_scheduled_for,
             )
-        except Exception as exc:
+        except Exception:
             self.emit(
                 ev.PatientContacted(at=now, topic=action.topic, delivered=False)
             )
@@ -472,7 +473,9 @@ class Engine:
             return True
 
         self._record_transcript(call_id, transcript, self.case.patient.name)
-        self.emit(ev.PatientContacted(at=now, topic=action.topic, delivered=True))
+        self.emit(
+            ev.PatientContacted(at=now, topic=action.topic, delivered=True, call_id=call_id)
+        )
         self.clock.advance(timedelta(minutes=5 + 2 * transcript.turns))
 
         if action.topic == "cost":
